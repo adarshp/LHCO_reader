@@ -147,6 +147,7 @@ from __future__ import division
 import os
 import warnings
 import inspect
+import gzip
 
 import numpy as np
 import partition_problem as pp
@@ -407,9 +408,34 @@ class Events(list):
         n_events = self.n_events
         event = None
 
-        if iszipfile == True:
+        if self.iszipfile == True:
             with gzip.open(self.LHCO_name, 'rb') as LHCO_file:
+                for line in parse_lines(LHCO_file):
+                    if line.startswith("0"):  # New event in file
+                        if event:  # Parse previous event, if there is one
+                            self.add_event(event)  # Add Event class
+                        event = [line]  # New event - reset event list
+                        # Don't parse more than a particular number of events
+                        if n_events and len(self) == n_events:
+                            warnings.warn("Didn't parse all LHCO events, "
+                                          "by request")
+                            return
+                    else:
     
+                        # If there is not a "0", line belongs to current event,
+                        # not a new event - add it to event
+                        try:
+                            event.append(line)
+                        except AttributeError:
+                            warnings.warn("Possibly an event did not start with 0")
+                            event = [line]
+    
+                # Parse final event in file - because there isn't a following event
+                # the final event won't be parsed as above
+                self.add_event(event)
+          
+        else:
+              with open(self.LHCO_name, 'r') as LHCO_file:
                 for line in parse_lines(LHCO_file):
     
                     if line.startswith("0"):  # New event in file
@@ -433,39 +459,9 @@ class Events(list):
                             warnings.warn("Possibly an event did not start with 0")
                             event = [line]
     
-                # Parse final event in file - because there isn't a following event
-                # the final event won't be parsed as above
-                self.add_event(event)
-            
-            else:
-                with open(self.LHCO_name, 'r') as LHCO_file:
-    
-                for line in parse_lines(LHCO_file):
-    
-                    if line.startswith("0"):  # New event in file
-    
-                        if event:  # Parse previous event, if there is one
-                            self.add_event(event)  # Add Event class
-                        event = [line]  # New event - reset event list
-    
-                        # Don't parse more than a particular number of events
-                        if n_events and len(self) == n_events:
-                            warnings.warn("Didn't parse all LHCO events, "
-                                          "by request")
-                            return
-                    else:
-    
-                        # If there is not a "0", line belongs to current event,
-                        # not a new event - add it to event
-                        try:
-                            event.append(line)
-                        except AttributeError:
-                            warnings.warn("Possibly an event did not start with 0")
-                            event = [line]
-    
-                # Parse final event in file - because there isn't a following event
-                # the final event won't be parsed as above
-                self.add_event(event)
+              # Parse final event in file - because there isn't a following event
+              # the final event won't be parsed as above
+              self.add_event(event)
 
     def number(self, anti_lepton=False):
         """
